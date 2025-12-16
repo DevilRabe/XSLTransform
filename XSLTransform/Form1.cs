@@ -21,6 +21,8 @@ namespace XSLTransform
 
                 AddTotalAttributeToEmployees();
 
+                AddTotalToPayInData1();
+
                 MessageBox.Show("Преобразование и обновление выполнены успешно!", "Готово",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -60,6 +62,32 @@ namespace XSLTransform
             }
 
             doc.Save("Employees.xml");
+        }
+
+        private void AddTotalToPayInData1()
+        {
+            if (!File.Exists("Data1.xml"))
+                throw new FileNotFoundException("Файл Data1.xml не найден.");
+
+            var doc = XDocument.Load("Data1.xml");
+            var culture = CultureInfo.InvariantCulture;
+            double total = 0.0;
+
+            foreach (var item in doc.Descendants("item"))
+            {
+                var amountAttr = item.Attribute("amount");
+                if (amountAttr?.Value != null)
+                {
+                    string amountStr = amountAttr.Value.Replace(",", ".");
+                    if (double.TryParse(amountStr, NumberStyles.Float, culture, out double value))
+                    {
+                        total += value;
+                    }
+                }
+            }
+            doc.Root?.SetAttributeValue("total", total.ToString(culture));
+
+            doc.Save("Data1.xml");
         }
     }
 }
