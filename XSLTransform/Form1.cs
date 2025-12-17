@@ -11,6 +11,24 @@ namespace XSLTransform
             InitializeComponent();
         }
 
+        private List<Employee> _employees = new List<Employee>();
+        private Dictionary<string, double> _totalMonthly = new Dictionary<string, double>();
+
+        private class Employee
+        {
+            public string Name { get; set; }
+            public string Surname { get; set; }
+            public double Total { get; set; }
+            public List<SalaryRecord> Salaries { get; set; } = new List<SalaryRecord>();
+        }
+
+        private class SalaryRecord
+        {
+            public string Month { get; set; }
+            public double Amount { get; set; }
+        }
+
+
         private void BtnRun_Click(object sender, EventArgs e)
         {
             try
@@ -23,8 +41,9 @@ namespace XSLTransform
 
                 AddTotalToPayInData1();
 
-                LoadEmployeesIntoGrid();
-                LoadMonthlyTotalsIntoGrid();
+                LoadDataFromEmployeesXml();
+                //LoadEmployeesIntoGrid();
+                //LoadMonthlyTotalsIntoGrid();
 
 
                 MessageBox.Show("Преобразование и обновление выполнены успешно!", "Готово",
@@ -36,7 +55,155 @@ namespace XSLTransform
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+        private void BtnAdd_Click(object sender, EventArgs e)
+        {
+            // Создаём диалоговое окно
+            using (var form = new Form())
+            {
+                form.Text = "Добавить новую выплату";
+                form.Width = 320;
+                form.Height = 240;
+                form.StartPosition = FormStartPosition.CenterParent;
+                form.FormBorderStyle = FormBorderStyle.FixedDialog;
+                form.MaximizeBox = false;
 
+                var layout = new TableLayoutPanel
+                {
+                    Dock = DockStyle.Fill,
+                    ColumnCount = 2,
+                    RowCount = 5,
+                    Padding = new Padding(10),
+                    AutoSize = true
+                };
+                layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
+                layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));
+                for (int i = 0; i < 5; i++)
+                    layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+                // Поля ввода
+                var txtName = new TextBox { Dock = DockStyle.Fill };
+                var txtSurname = new TextBox { Dock = DockStyle.Fill };
+                var txtAmount = new TextBox { Dock = DockStyle.Fill };
+
+                // ? ComboBox для месяца
+                var cmbMonth = new ComboBox { Dock = DockStyle.Fill };
+                // Месяцы на английском, строчные — как в XML
+                string[] months = { "january", "february", "march", "april", "may", "june",
+                            "july", "august", "september", "october", "november", "december" };
+                cmbMonth.Items.AddRange(months);
+                cmbMonth.SelectedIndex = 0; // по умолчанию — январь
+
+                // Метки
+                layout.Controls.Add(new Label { Text = "Имя:", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 0);
+                layout.Controls.Add(txtName, 1, 0);
+
+                layout.Controls.Add(new Label { Text = "Фамилия:", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 1);
+                layout.Controls.Add(txtSurname, 1, 1);
+
+                layout.Controls.Add(new Label { Text = "Сумма:", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 2);
+                layout.Controls.Add(txtAmount, 1, 2);
+
+                layout.Controls.Add(new Label { Text = "Месяц:", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 3);
+                layout.Controls.Add(cmbMonth, 1, 3);
+
+                // ? Кнопки (правильно размещены!)
+                var btnPanel = new FlowLayoutPanel
+                {
+                    Dock = DockStyle.Fill,
+                    FlowDirection = FlowDirection.RightToLeft,
+                    Padding = new Padding(0, 10, 0, 0)
+                };
+
+                var btnCancel = new Button { Text = "Отмена", Width = 80, DialogResult = DialogResult.Cancel };
+                var btnAdd = new Button { Text = "Добавить", Width = 80 };
+                btnAdd.Click += (s, args) =>
+                {
+                    // Валидация
+                    if (string.IsNullOrWhiteSpace(txtName.Text) ||
+                        string.IsNullOrWhiteSpace(txtSurname.Text) ||
+                        string.IsNullOrWhiteSpace(txtAmount.Text))
+                    {
+                        MessageBox.Show("Заполните все поля!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    string amountStr = txtAmount.Text.Replace(",", ".");
+                    if (!double.TryParse(amountStr, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                    {
+                        MessageBox.Show("Некорректная сумма!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // ? Получаем выбранный месяц из ComboBox
+                    string selectedMonth = cmbMonth.SelectedItem?.ToString() ?? "january";
+
+                    // Добавляем в Data1.xml
+                    AppendNewItemToData1(
+                        txtName.Text.Trim(),
+                        txtSurname.Text.Trim(),
+                        txtAmount.Text.Trim(),
+                        selectedMonth
+                    );
+
+                    // Пересчёт
+                    PerformFullRecalculation();
+
+                    form.DialogResult = DialogResult.OK;
+                    form.Close();
+                };
+
+                btnPanel.Controls.Add(btnAdd);
+                btnPanel.Controls.Add(btnCancel);
+
+                layout.Controls.Add(btnPanel, 1, 4);
+                form.Controls.Add(layout);
+
+                // Нажатие Enter ? добавить
+                txtAmount.KeyDown += (s, args) =>
+                {
+                    if (args.KeyCode == Keys.Enter)
+                        btnAdd.PerformClick();
+                };
+
+                form.ShowDialog(this);
+            }
+        }
+
+        private void dgvEmployees_SelectionChanged(object sender, EventArgs e)
+        {
+            // Очищаем вторую таблицу
+            dgvMonthly.Rows.Clear();
+            dgvMonthly.Columns.Clear();
+            dgvMonthly.Columns.Add("Month", "Месяц");
+            dgvMonthly.Columns.Add("Amount", "Сумма");
+
+            var culture = CultureInfo.InvariantCulture;
+
+            if (dgvEmployees.SelectedRows.Count == 0)
+            {
+                // Ничего не выбрано ? показываем общую сводку
+                foreach (var kvp in _totalMonthly.OrderBy(x => x.Key))
+                {
+                    dgvMonthly.Rows.Add(kvp.Key, kvp.Value.ToString("N2", culture));
+                }
+            }
+            else
+            {
+                // Выбран сотрудник ? показываем его данные
+                var selectedRow = dgvEmployees.SelectedRows[0];
+                string name = selectedRow.Cells["Name"].Value?.ToString() ?? "";
+                string surname = selectedRow.Cells["Surname"].Value?.ToString() ?? "";
+
+                var emp = _employees.FirstOrDefault(e => e.Name == name && e.Surname == surname);
+                if (emp != null)
+                {
+                    foreach (var sal in emp.Salaries)
+                    {
+                        dgvMonthly.Rows.Add(sal.Month, sal.Amount.ToString("N2", culture));
+                    }
+                }
+            }
+        }
 
         private void LoadEmployeesIntoGrid()
         {
@@ -72,7 +239,7 @@ namespace XSLTransform
             dgvMonthly.Columns.Add("Amount", "Сумма");
 
             if (!File.Exists("Employees.xml"))
-                throw new FileNotFoundException("Файл Employees.xml не найден после XSLT-преобразования.");
+                throw new FileNotFoundException("Файл Employees.xml не найден!");
 
             var doc = XDocument.Load("Employees.xml");
             var culture = CultureInfo.InvariantCulture;
@@ -155,5 +322,113 @@ namespace XSLTransform
 
             doc.Save("Data1.xml");
         }
+
+        
+
+        private void AppendNewItemToData1(string name, string surname, string amount, string month)
+        {
+            if (!File.Exists("Data1.xml"))
+                throw new FileNotFoundException("Файл Data1.xml не найден!");
+
+            var doc = XDocument.Load("Data1.xml");
+            var newItem = new XElement("item",
+                new XAttribute("name", name),
+                new XAttribute("surname", surname),
+                new XAttribute("amount", amount),
+                new XAttribute("mount", month)
+            );
+
+            doc.Root?.Add(newItem);
+            doc.Save("Data1.xml");
+        }
+        private void PerformFullRecalculation()
+        {
+            try
+            {
+                var xslt = new XslCompiledTransform();
+                xslt.Load("transform.xsl");
+                xslt.Transform("Data1.xml", "Employees.xml");
+
+                AddTotalAttributeToEmployees();
+                AddTotalToPayInData1();
+                LoadDataFromEmployeesXml(); // обновляет _employees и таблицы
+
+                // Опционально: уведомление
+                MessageBox.Show("Данные обновлены!", "Инфо", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при пересчёте: {ex.Message}", "Ошибка",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
+        private void LoadDataFromEmployeesXml()
+        {
+            _employees.Clear();
+
+            if (!File.Exists("Employees.xml"))
+                throw new FileNotFoundException("Файл Employees.xml не найден!");
+
+            var doc = XDocument.Load("Employees.xml");
+            var culture = CultureInfo.InvariantCulture;
+
+            foreach (var empElem in doc.Root.Elements("Employee"))
+            {
+                string name = empElem.Attribute("name")?.Value ?? "";
+                string surname = empElem.Attribute("surname")?.Value ?? "";
+                string totalStr = empElem.Attribute("total")?.Value ?? "0";
+                double total = double.TryParse(totalStr.Replace(",", "."), NumberStyles.Float, culture, out var t) ? t : 0;
+
+                var emp = new Employee
+                {
+                    Name = name,
+                    Surname = surname,
+                    Total = total
+                };
+
+                foreach (var sal in empElem.Elements("salary"))
+                {
+                    string month = sal.Attribute("mount")?.Value ?? "unknown";
+                    string amountStr = sal.Attribute("amount")?.Value ?? "0";
+                    amountStr = amountStr.Replace(",", ".");
+                    double amount = double.TryParse(amountStr, NumberStyles.Float, culture, out var a) ? a : 0;
+
+                    emp.Salaries.Add(new SalaryRecord { Month = month, Amount = amount });
+                }
+
+                _employees.Add(emp);
+            }
+
+            foreach (var emp in _employees)
+            {
+                foreach (var sal in emp.Salaries)
+                {
+                    if (!_totalMonthly.ContainsKey(sal.Month))
+                        _totalMonthly[sal.Month] = 0;
+                    _totalMonthly[sal.Month] += sal.Amount;
+                }
+            }
+
+            RefreshEmployeesGrid();
+        }
+        private void RefreshEmployeesGrid()
+        {
+            dgvEmployees.Rows.Clear();
+            dgvEmployees.Columns.Clear();
+            dgvEmployees.Columns.Add("Name", "Имя");
+            dgvEmployees.Columns.Add("Surname", "Фамилия");
+            dgvEmployees.Columns.Add("Total", "Общая сумма");
+
+            foreach (var emp in _employees)
+            {
+                dgvEmployees.Rows.Add(emp.Name, emp.Surname, emp.Total.ToString("N2", CultureInfo.InvariantCulture));
+            }
+
+            dgvMonthly.Rows.Clear();
+        }
+
+        
     }
 }

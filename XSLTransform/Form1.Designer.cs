@@ -33,6 +33,7 @@
             dgvMonthly = new DataGridView();
             lblEmployees = new Label();
             lblMonthly = new Label();
+            BtnAdd = new Button();
             ((System.ComponentModel.ISupportInitialize)dgvEmployees).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvMonthly).BeginInit();
             SuspendLayout();
@@ -57,6 +58,7 @@
             dgvEmployees.ReadOnly = true;
             dgvEmployees.Size = new Size(380, 300);
             dgvEmployees.TabIndex = 2;
+            dgvEmployees.SelectionChanged += dgvEmployees_SelectionChanged;
             // 
             // dgvMonthly
             // 
@@ -87,11 +89,22 @@
             lblMonthly.TabIndex = 3;
             lblMonthly.Text = "Выплаты по месяцам:";
             // 
+            // BtnAdd
+            // 
+            BtnAdd.Location = new Point(118, 15);
+            BtnAdd.Name = "BtnAdd";
+            BtnAdd.Size = new Size(108, 23);
+            BtnAdd.TabIndex = 5;
+            BtnAdd.Text = "Добавить запись";
+            BtnAdd.UseVisualStyleBackColor = true;
+            BtnAdd.Click += BtnAdd_Click;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(BtnAdd);
             Controls.Add(BtnRun);
             Controls.Add(lblEmployees);
             Controls.Add(dgvEmployees);
@@ -112,5 +125,6 @@
         private DataGridView dgvMonthly;
         private Label lblEmployees;
         private Label lblMonthly;
+        private Button BtnAdd;
     }
 }
