@@ -57,7 +57,6 @@ namespace XSLTransform
         }
         private void BtnAdd_Click(object sender, EventArgs e)
         {
-            // Создаём диалоговое окно
             using (var form = new Form())
             {
                 form.Text = "Добавить новую выплату";
@@ -80,20 +79,17 @@ namespace XSLTransform
                 for (int i = 0; i < 5; i++)
                     layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-                // Поля ввода
                 var txtName = new TextBox { Dock = DockStyle.Fill };
                 var txtSurname = new TextBox { Dock = DockStyle.Fill };
                 var txtAmount = new TextBox { Dock = DockStyle.Fill };
 
-                // ? ComboBox для месяца
                 var cmbMonth = new ComboBox { Dock = DockStyle.Fill };
-                // Месяцы на английском, строчные — как в XML
+
                 string[] months = { "january", "february", "march", "april", "may", "june",
                             "july", "august", "september", "october", "november", "december" };
                 cmbMonth.Items.AddRange(months);
-                cmbMonth.SelectedIndex = 0; // по умолчанию — январь
+                cmbMonth.SelectedIndex = 0;
 
-                // Метки
                 layout.Controls.Add(new Label { Text = "Имя:", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 0);
                 layout.Controls.Add(txtName, 1, 0);
 
@@ -106,7 +102,6 @@ namespace XSLTransform
                 layout.Controls.Add(new Label { Text = "Месяц:", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 3);
                 layout.Controls.Add(cmbMonth, 1, 3);
 
-                // ? Кнопки (правильно размещены!)
                 var btnPanel = new FlowLayoutPanel
                 {
                     Dock = DockStyle.Fill,
@@ -118,7 +113,6 @@ namespace XSLTransform
                 var btnAdd = new Button { Text = "Добавить", Width = 80 };
                 btnAdd.Click += (s, args) =>
                 {
-                    // Валидация
                     if (string.IsNullOrWhiteSpace(txtName.Text) ||
                         string.IsNullOrWhiteSpace(txtSurname.Text) ||
                         string.IsNullOrWhiteSpace(txtAmount.Text))
@@ -133,19 +127,14 @@ namespace XSLTransform
                         MessageBox.Show("Некорректная сумма!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
-
-                    // ? Получаем выбранный месяц из ComboBox
                     string selectedMonth = cmbMonth.SelectedItem?.ToString() ?? "january";
 
-                    // Добавляем в Data1.xml
                     AppendNewItemToData1(
                         txtName.Text.Trim(),
                         txtSurname.Text.Trim(),
                         txtAmount.Text.Trim(),
                         selectedMonth
                     );
-
-                    // Пересчёт
                     PerformFullRecalculation();
 
                     form.DialogResult = DialogResult.OK;
@@ -158,7 +147,6 @@ namespace XSLTransform
                 layout.Controls.Add(btnPanel, 1, 4);
                 form.Controls.Add(layout);
 
-                // Нажатие Enter ? добавить
                 txtAmount.KeyDown += (s, args) =>
                 {
                     if (args.KeyCode == Keys.Enter)
@@ -171,7 +159,6 @@ namespace XSLTransform
 
         private void dgvEmployees_SelectionChanged(object sender, EventArgs e)
         {
-            // Очищаем вторую таблицу
             dgvMonthly.Rows.Clear();
             dgvMonthly.Columns.Clear();
             dgvMonthly.Columns.Add("Month", "Месяц");
@@ -181,7 +168,6 @@ namespace XSLTransform
 
             if (dgvEmployees.SelectedRows.Count == 0)
             {
-                // Ничего не выбрано ? показываем общую сводку
                 foreach (var kvp in _totalMonthly.OrderBy(x => x.Key))
                 {
                     dgvMonthly.Rows.Add(kvp.Key, kvp.Value.ToString("N2", culture));
@@ -189,7 +175,6 @@ namespace XSLTransform
             }
             else
             {
-                // Выбран сотрудник ? показываем его данные
                 var selectedRow = dgvEmployees.SelectedRows[0];
                 string name = selectedRow.Cells["Name"].Value?.ToString() ?? "";
                 string surname = selectedRow.Cells["Surname"].Value?.ToString() ?? "";
@@ -323,8 +308,6 @@ namespace XSLTransform
             doc.Save("Data1.xml");
         }
 
-        
-
         private void AppendNewItemToData1(string name, string surname, string amount, string month)
         {
             if (!File.Exists("Data1.xml"))
@@ -351,9 +334,8 @@ namespace XSLTransform
 
                 AddTotalAttributeToEmployees();
                 AddTotalToPayInData1();
-                LoadDataFromEmployeesXml(); // обновляет _employees и таблицы
+                LoadDataFromEmployeesXml();
 
-                // Опционально: уведомление
                 MessageBox.Show("Данные обновлены!", "Инфо", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
@@ -410,7 +392,6 @@ namespace XSLTransform
                     _totalMonthly[sal.Month] += sal.Amount;
                 }
             }
-
             RefreshEmployeesGrid();
         }
         private void RefreshEmployeesGrid()
@@ -428,7 +409,5 @@ namespace XSLTransform
 
             dgvMonthly.Rows.Clear();
         }
-
-        
     }
 }
